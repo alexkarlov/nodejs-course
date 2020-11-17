@@ -16,12 +16,12 @@ const headerFile = [
 
 function getEventById(req, res) {
   lockEvents(req, res, (req, res) => {
-    let event = {};
+    let event;
     fs.createReadStream(filePath)
       .pipe(csv())
       .on("data", (data) => {
         // if we found one row no need to check others
-        if (Object.keys(event).length !== 0) {
+        if (event) {
           return;
         }
         if (data.id == req.params.eventId) {
@@ -29,11 +29,15 @@ function getEventById(req, res) {
         }
       })
       .on("end", () => {
-        if (Object.keys(event).length === 0) {
+        if (!event) {
           res.status(404).send("event not found");
         } else {
           res.send(event);
         }
+      })
+      .on("error", (err) => {
+        console.log("error while reading the file", err);
+        res.status(500).send("internal error");
       });
   });
 }
@@ -53,6 +57,10 @@ function getEvents(req, res) {
       })
       .on("end", () => {
         res.send(results);
+      })
+      .on("error", (err) => {
+        console.log("error while reading the file", err);
+        res.status(500).send("internal error");
       });
   });
 }
@@ -108,6 +116,10 @@ function updateEvent(req, res) {
         csvWriter.writeRecords(results).then(() => {
           res.status(200).send();
         });
+      })
+      .on("error", (err) => {
+        console.log("error while reading the file", err);
+        res.status(500).send("internal error");
       });
   });
 }
@@ -138,6 +150,10 @@ function deleteEvent(req, res) {
           console.log("The CSV file was written successfully");
           res.status(200).send();
         });
+      })
+      .on("error", (err) => {
+        console.log("error while reading the file", err);
+        res.status(500).send("internal error");
       });
   });
 }
@@ -147,17 +163,18 @@ function getEventsBatch(req, res) {
     let results = [];
     fs.createReadStream(filePath)
       .pipe(csv())
-      .on("data", (data) => {
-        results.push(data);
-      })
-      .on("end", () => {
-        res.send(results);
+      .pipe(res)
+      .on("error", (err) => {
+        console.log("error while reading the file", err);
+        res.status(500).send("internal error");
       });
   });
 }
 
 function lockEvents(req, res, callback) {
-  lockFile.lock("some-file.lock", {}, function (er) {
+  lockFile.lock("some-file.lock", { retryWait: 100, retries: 10 }, function (
+    er
+  ) {
     if (er) {
       console.error("error while locking file", er);
       res.status(500).send();
