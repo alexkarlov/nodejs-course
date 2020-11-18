@@ -13,9 +13,7 @@ const headerFile = [
   { id: "timestamp", title: "timestamp" },
 ];
 
-function getEventById(req, res, storage) {
-  state = storage.getStore();
-  console.log("state", state);
+function getEventById(req, res) {
   lockEvents(req, res, (req, res) => {
     let event = {};
     fs.createReadStream(filePath)
