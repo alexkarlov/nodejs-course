@@ -3,7 +3,6 @@ const createCsvWriter = require("csv-writer").createObjectCsvWriter;
 const csv = require("csv-parser");
 const fs = require("fs");
 const converter = require("json-2-csv");
-const { EOF } = require("dns");
 const lockFile = require("lockfile");
 
 const filePath = path.join(__dirname, "events.csv");
@@ -14,7 +13,9 @@ const headerFile = [
   { id: "timestamp", title: "timestamp" },
 ];
 
-function getEventById(req, res) {
+function getEventById(req, res, storage) {
+  state = storage.getStore();
+  console.log("state", state);
   lockEvents(req, res, (req, res) => {
     let event = {};
     fs.createReadStream(filePath)
