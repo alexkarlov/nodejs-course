@@ -1,10 +1,21 @@
+const winston = require("winston");
+
 class Logger {
+  logger;
+  constructor() {
+    this.logger = winston.createLogger({
+      level: "debug",
+      format: winston.format.json(),
+      transports: [new winston.transports.Console()],
+    });
+  }
+
   log(...msg) {
     const extra = extractReq(msg);
     if (extra !== null) {
       msg[0] = extra;
     }
-    console.log(...msg);
+    this.logger.info(...msg);
   }
 
   debug(...msg) {
@@ -12,7 +23,7 @@ class Logger {
     if (extra !== null) {
       msg[0] = extra;
     }
-    console.debug(msg);
+    this.logger.debug(...msg);
   }
 
   error(...msg) {
@@ -20,7 +31,7 @@ class Logger {
     if (extra !== null) {
       msg[0] = extra;
     }
-    console.error(...msg);
+    this.logger.error(...msg);
   }
 
   warn(...msg) {
@@ -28,7 +39,7 @@ class Logger {
     if (extra !== null) {
       msg[0] = extra;
     }
-    console.warn(...msg);
+    this.logger.warn(...msg);
   }
 }
 
