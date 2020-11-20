@@ -8,8 +8,7 @@ const storage = new AsyncLocalStorage();
 const Logger = require("./logger").createLogger();
 
 const requestIdMiddleware = (req, res, next) => {
-  storage.run(new Map(), () => {
-    storage.getStore().set("requestId", uuid.v4());
+  storage.run(new Map([["requestId", uuid.v4()]]), () => {
     next();
   });
 };
@@ -17,7 +16,7 @@ const requestIdMiddleware = (req, res, next) => {
 app.use(requestIdMiddleware);
 app.use(function (req, res, next) {
   ctx = {
-    traceID: uuid.v4(),
+    traceID: storage.getStore().get("requestId"),
   };
   req.context = ctx;
   Logger.log(req, "new request");
@@ -26,7 +25,7 @@ app.use(function (req, res, next) {
 app.use(express.json());
 app.get("/events/:eventId", (req, res) => {
   const id = storage.getStore().get("requestId");
-  console.log(`[${id}] request received`);
+  Logger.log(`[${id}] request received`);
   handlers.getEventById(req, res);
 });
 app.get("/events", handlers.getEvents);
@@ -36,5 +35,5 @@ app.delete("/events/:eventId", handlers.deleteEvent);
 app.get("/events-batch", handlers.getEventsBatch);
 app.use(handlers.errorHandler);
 app.listen(3000, function () {
-  console.log("listening on 3000");
+  Logger.log("listening on 3000");
 });

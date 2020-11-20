@@ -19,7 +19,7 @@ class Logger {
   }
 
   debug(...msg) {
-    extra = extractReq(msg);
+    const extra = extractReq(msg);
     if (extra !== null) {
       msg[0] = extra;
     }
@@ -27,7 +27,7 @@ class Logger {
   }
 
   error(...msg) {
-    extra = extractReq(msg);
+    const extra = extractReq(msg);
     if (extra !== null) {
       msg[0] = extra;
     }
@@ -35,7 +35,7 @@ class Logger {
   }
 
   warn(...msg) {
-    extra = extractReq(msg);
+    const extra = extractReq(msg);
     if (extra !== null) {
       msg[0] = extra;
     }
