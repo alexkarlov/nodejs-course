@@ -3,8 +3,8 @@ const createCsvWriter = require("csv-writer").createObjectCsvWriter;
 const csv = require("csv-parser");
 const fs = require("fs");
 const converter = require("json-2-csv");
-const { EOF } = require("dns");
 const lockFile = require("lockfile");
+const Logger = require(path.join(__dirname, "..", "logger")).createLogger();
 
 const filePath = path.join(__dirname, "events.csv");
 const headerFile = [
@@ -191,6 +191,11 @@ function lockEvents(req, res, callback) {
   });
 }
 
+function errorHandler(err, req, res, next) {
+  Logger.error(err.stack);
+  res.status(500).send("internal error");
+}
+
 module.exports = {
   getEventById: getEventById,
   getEvents: getEvents,
@@ -198,4 +203,5 @@ module.exports = {
   updateEvent: updateEvent,
   deleteEvent: deleteEvent,
   getEventsBatch: getEventsBatch,
+  errorHandler: errorHandler,
 };
