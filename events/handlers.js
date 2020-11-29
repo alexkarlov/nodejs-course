@@ -1,194 +1,138 @@
 const path = require("path");
-const createCsvWriter = require("csv-writer").createObjectCsvWriter;
-const csv = require("csv-parser");
-const fs = require("fs");
-const converter = require("json-2-csv");
-const lockFile = require("lockfile");
 const Logger = require(path.join(__dirname, "..", "logger")).createLogger();
-
-const filePath = path.join(__dirname, "events.csv");
-const headerFile = [
-  { id: "id", title: "id" },
-  { id: "title", title: "title" },
-  { id: "location", title: "location" },
-  { id: "timestamp", title: "timestamp" },
-];
+const db = require(path.join(__dirname, "..", "models", "index"));
 
 function getEventById(req, res) {
-  lockEvents(req, res, (req, res) => {
-    let event;
-    fs.createReadStream(filePath)
-      .pipe(csv())
-      .on("data", (data) => {
-        // if we found one row no need to check others
-        if (event) {
-          return;
-        }
-        if (data.id == req.params.eventId) {
-          event = data;
-        }
-      })
-      .on("end", () => {
-        if (!event) {
-          res.status(404).send("event not found");
-        } else {
-          res.send(event);
-        }
-      })
-      .on("error", (err) => {
-        console.log("error while reading the file", err);
-        res.status(500).send("internal error");
+  db.eventModel
+    .findByPk(parseInt(req.params.eventId), {
+      include: [
+        { model: db.userModel, as: "owner" },
+        { model: db.userModel, as: "participants" },
+      ],
+    })
+    .then((data) => {
+      if (!data) {
+        return res.status(200).send({
+          status: 404,
+          message: "No data found",
+        });
+      }
+      res.status(200).send(data);
+    })
+    .catch(function (e) {
+      console.log(e);
+      res.status(500).send({
+        message: "something went wrong",
+        error: e,
       });
-  });
+    });
 }
 
 function getEvents(req, res) {
-  lockEvents(req, res, (req, res) => {
-    let results = [];
-    fs.createReadStream(filePath)
-      .pipe(csv())
-      .on("data", (data) => {
-        if (
-          req.query.location === undefined ||
-          req.query.location == data.location
-        ) {
-          results.push(data);
-        }
-      })
-      .on("end", () => {
-        res.send(results);
-      })
-      .on("error", (err) => {
-        console.log("error while reading the file", err);
-        res.status(500).send("internal error");
+  db.eventModel
+    .findAll({
+      include: [
+        { model: db.userModel, as: "owner" },
+        { model: db.userModel, as: "participants" },
+      ],
+    })
+    .then((events) => {
+      if (!events) {
+        return res.status(200).send({
+          status: 404,
+          message: "No data found",
+        });
+      }
+      res.status(200).send(events);
+    })
+    .catch(function (e) {
+      res.status(500).send({
+        message: "something went wrong",
+        error: e,
       });
-  });
+    });
 }
 
 function createEvent(req, res) {
-  lockEvents(req, res, (req, res) => {
-    // just add at the end of the file
-    fs.open(filePath, "a", 666, function (e, id) {
-      // convert JSON array to CSV string
-      converter.json2csv(
-        req.body,
-        (err, csv) => {
-          if (err) {
-            res.status(500).send();
-            return;
-          }
-          const row = "\n" + csv;
-          fs.write(id, row, null, "utf8", function () {
-            fs.close(id, function () {
-              res.status(200).send();
-            });
-          });
-        },
-        { prependHeader: false }
-      );
+  db.eventModel
+    .create(req.body)
+    .then((event) => {
+      res.status(200).send(event);
+    })
+    .catch(function (e) {
+      res.status(500).send({
+        message: "something went wrong",
+        error: e,
+      });
     });
-  });
 }
 
 function updateEvent(req, res) {
-  lockEvents(req, res, (req, res) => {
-    let results = [];
-    let found = false;
-    fs.createReadStream(filePath)
-      .pipe(csv())
-      .on("data", (data) => {
-        if (data.id == req.params.eventId) {
-          found = true;
-          results.push(req.body);
-        } else {
-          results.push(data);
-        }
-      })
-      .on("end", () => {
-        if (found === false) {
-          res.status(404).send("event not found");
-          return;
-        }
-        const csvWriter = createCsvWriter({
-          path: filePath,
-          header: headerFile,
-        });
-        csvWriter.writeRecords(results).then(() => {
-          res.status(200).send();
-        });
-      })
-      .on("error", (err) => {
-        console.log("error while reading the file", err);
-        res.status(500).send("internal error");
+  db.eventModel
+    .update(req.body, {
+      where: { id: req.params.eventId },
+    })
+    .then(() => {
+      res.status(200).send("ok");
+    })
+    .catch(function (e) {
+      res.status(500).send({
+        message: "something went wrong",
+        error: e,
       });
-  });
+    });
 }
 
 function deleteEvent(req, res) {
-  lockEvents(req, res, (req, res) => {
-    let results = [];
-    let found = false;
-    fs.createReadStream(filePath)
-      .pipe(csv())
-      .on("data", (data) => {
-        if (data.id == req.params.eventId) {
-          found = true;
-          return;
-        }
-        results.push(data);
-      })
-      .on("end", () => {
-        if (found === false) {
-          res.status(404).send("event not found");
-          return;
-        }
-        const csvWriter = createCsvWriter({
-          path: filePath,
-          header: headerFile,
-        });
-        csvWriter.writeRecords(results).then(() => {
-          console.log("The CSV file was written successfully");
-          res.status(200).send();
-        });
-      })
-      .on("error", (err) => {
-        console.log("error while reading the file", err);
-        res.status(500).send("internal error");
+  db.eventModel
+    .destroy({
+      where: { id: req.params.eventId },
+    })
+    .then(() => {
+      res.status(200).send("ok");
+    })
+    .catch(function (e) {
+      res.status(500).send({
+        message: "something went wrong",
+        error: e,
       });
-  });
-}
-
-function getEventsBatch(req, res) {
-  lockEvents(req, res, (req, res) => {
-    let results = [];
-    fs.createReadStream(filePath)
-      .pipe(csv())
-      .pipe(res)
-      .on("error", (err) => {
-        console.log("error while reading the file", err);
-        res.status(500).send("internal error");
-      });
-  });
-}
-
-function lockEvents(req, res, callback) {
-  lockFile.lock("some-file.lock", { retryWait: 100, retries: 10 }, function (
-    er
-  ) {
-    if (er) {
-      console.error("error while locking file", er);
-      res.status(500).send();
-      return;
-    }
-    callback(req, res);
-    lockFile.unlock("some-file.lock", function (er) {
-      if (er) {
-        console.error("error while unlocking file", er);
-        res.status(500).send();
-        return;
-      }
     });
-  });
+}
+
+function createUser(req, res) {
+  db.userModel
+    .create(req.body)
+    .then((user) => {
+      res.status(200).send(user);
+    })
+    .catch(function (e) {
+      res.status(500).send({
+        message: "something went wrong",
+        error: e,
+      });
+    });
+}
+
+async function deleteUser(req, res) {
+  const tr = await db.sequelize.transaction();
+  try {
+    await db.eventModel.destroy({
+      where: { ownerId: req.params.userId },
+      transaction: tr,
+    });
+    await db.userModel.destroy({
+      where: { id: req.params.userId },
+      transaction: tr,
+    });
+    await tr.commit();
+    res.status(200).send("ok");
+  } catch (err) {
+    await tr.rollback();
+    res.status(500).send({
+      message: "something went wrong",
+      error: err,
+    });
+  }
 }
 
 function errorHandler(err, req, res, next) {
@@ -202,6 +146,7 @@ module.exports = {
   createEvent: createEvent,
   updateEvent: updateEvent,
   deleteEvent: deleteEvent,
-  getEventsBatch: getEventsBatch,
+  createUser: createUser,
+  deleteUser: deleteUser,
   errorHandler: errorHandler,
 };
