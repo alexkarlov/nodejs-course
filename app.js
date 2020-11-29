@@ -32,7 +32,8 @@ app.get("/events", handlers.getEvents);
 app.post("/events", handlers.createEvent);
 app.put("/events/:eventId", handlers.updateEvent);
 app.delete("/events/:eventId", handlers.deleteEvent);
-app.get("/events-batch", handlers.getEventsBatch);
+app.post("/users", handlers.createUser);
+app.delete("/users/:userId", handlers.deleteUser);
 app.use(handlers.errorHandler);
 app.listen(3000, function () {
   Logger.log("listening on 3000");
