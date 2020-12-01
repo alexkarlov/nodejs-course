@@ -1,6 +1,9 @@
+require("dotenv").config();
 const path = require("path");
 const Logger = require(path.join(__dirname, "..", "logger")).createLogger();
 const db = require(path.join(__dirname, "..", "models", "index"));
+const jwt = require("jsonwebtoken");
+const tokenList = {};
 
 function getEventById(req, res) {
   db.eventModel
@@ -140,6 +143,65 @@ function errorHandler(err, req, res, next) {
   res.status(500).send("internal error");
 }
 
+async function login(req, res) {
+  const postData = req.body;
+  try {
+    user = await db.userModel.findOne({
+      where: {
+        email: postData.email,
+        pass: postData.pass,
+      },
+    });
+    if (!user) {
+      res.status(401).send("wrong email or pass");
+      return;
+    }
+
+    const userAuth = {
+      email: postData.email,
+    };
+    // do the database authentication here, with user name and password combination.
+    const accessToken = jwt.sign(userAuth, process.env.ACCESS_TOKEN_SECRET, {
+      expiresIn: process.env.ACCESS_TOKEN_EXPIRATION_TIME,
+    });
+    const refreshToken = jwt.sign(userAuth, process.env.REFRESH_TOKEN_SECRET, {
+      expiresIn: process.env.REFRESH_TOKEN_EXPIRATION_TIME,
+    });
+    const response = {
+      status: "Logged in",
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+    };
+    tokenList[refreshToken] = response;
+    res.status(200).json(response);
+  } catch (e) {
+    console.log(e);
+    res.status(500).send("something went wrong");
+  }
+}
+
+function refreshToken(req, res) {
+  // refresh the damn token
+  const postData = req.body;
+  // if refresh token exists
+  if (postData.refreshToken && postData.refreshToken in tokenList) {
+    const user = {
+      email: postData.email,
+    };
+    const token = jwt.sign(user, process.env.REFRESH_TOKEN_SECRET, {
+      expiresIn: process.env.ACCESS_TOKEN_EXPIRATION_TIME,
+    });
+    const response = {
+      token: token,
+    };
+    // update the token in the list
+    tokenList[postData.refreshToken].token = token;
+    res.status(200).json(response);
+  } else {
+    res.status(404).send("Invalid request");
+  }
+}
+
 module.exports = {
   getEventById: getEventById,
   getEvents: getEvents,
@@ -148,5 +210,7 @@ module.exports = {
   deleteEvent: deleteEvent,
   createUser: createUser,
   deleteUser: deleteUser,
+  login: login,
+  refreshToken: refreshToken,
   errorHandler: errorHandler,
 };
