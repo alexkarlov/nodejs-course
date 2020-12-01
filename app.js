@@ -13,6 +13,8 @@ const requestIdMiddleware = (req, res, next) => {
   });
 };
 
+const auth = require(path.join(__dirname, "middlewares", "auth"));
+
 app.use(requestIdMiddleware);
 app.use(function (req, res, next) {
   ctx = {
@@ -23,17 +25,22 @@ app.use(function (req, res, next) {
   next();
 });
 app.use(express.json());
-app.get("/events/:eventId", (req, res) => {
+app.get("/events/:eventId", auth, (req, res) => {
   const id = storage.getStore().get("requestId");
   Logger.log(`[${id}] request received`);
   handlers.getEventById(req, res);
 });
-app.get("/events", handlers.getEvents);
-app.post("/events", handlers.createEvent);
-app.put("/events/:eventId", handlers.updateEvent);
-app.delete("/events/:eventId", handlers.deleteEvent);
-app.post("/users", handlers.createUser);
-app.delete("/users/:userId", handlers.deleteUser);
+app.get("/events", auth, handlers.getEvents);
+app.post("/events", auth, handlers.createEvent);
+app.put("/events/:eventId", auth, handlers.updateEvent);
+app.delete("/events/:eventId", auth, handlers.deleteEvent);
+app.post("/users", auth, handlers.createUser);
+app.delete("/users/:userId", auth, handlers.deleteUser);
+app.post("/login", handlers.login);
+app.post("/refresh_token", handlers.refreshToken);
+app.get("/check_access", auth, (req, res) => {
+  res.status(200).send("ok");
+});
 app.use(handlers.errorHandler);
 app.listen(3000, function () {
   Logger.log("listening on 3000");
