@@ -6,6 +6,8 @@ const uuid = require("uuid");
 const { AsyncLocalStorage } = require("async_hooks");
 const storage = new AsyncLocalStorage();
 const Logger = require("./logger").createLogger();
+const WebSocketServer = require("websocket").server;
+const fs = require("fs").promises;
 
 const requestIdMiddleware = (req, res, next) => {
   storage.run(new Map([["requestId", uuid.v4()]]), () => {
@@ -41,7 +43,50 @@ app.post("/refresh_token", handlers.refreshToken);
 app.get("/check_access", auth, (req, res) => {
   res.status(200).send("ok");
 });
+app.use(express.static("public"));
 app.use(handlers.errorHandler);
-app.listen(3000, function () {
+const server = app.listen(3000, function () {
   Logger.log("listening on 3000");
+});
+let connections = [];
+
+wsServer = new WebSocketServer({
+  httpServer: server,
+  autoAcceptConnections: false,
+});
+
+wsServer.on("request", function (request) {
+  const connection = request.accept();
+  connections.push(connection);
+  console.log(new Date() + " Connection accepted.");
+  connection.on("message", async function (message) {
+    if (message.type === "utf8") {
+      console.log("Received Message: " + message.utf8Data);
+      connections.forEach((conn) => {
+        conn.send("new msg: " + message.utf8Data);
+      });
+    } else if (message.type === "binary") {
+      console.log(
+        "Received Binary Message of " + message.binaryData.length + " bytes"
+      );
+      try {
+        const fname = uuid.v4();
+        const fpath = path.join(__dirname, "public", "files", fname);
+        const fURL = "http://localhost:3000/files/" + fname;
+        await fs.writeFile(fpath, message.binaryData, "binary");
+        // send path to the clients
+        connections.forEach((conn) => {
+          conn.send("file URL: " + fURL);
+        });
+        Logger.log(`file ${fpath} has been saved`);
+      } catch (err) {
+        console.log(err);
+      }
+    }
+  });
+  connection.on("close", function (reasonCode, description) {
+    console.log(
+      new Date() + " Peer " + connection.remoteAddress + " disconnected."
+    );
+  });
 });

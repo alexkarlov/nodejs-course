@@ -1,0 +1,41 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Upload Files</title>
+</head>
+<body>
+    <h2>File Upload</h2>
+    Select file
+    <input type="file" id="filename" />
+    <br>
+    <input type="button" value="Upload" onclick="sendFile()" />
+    <script>
+        function sendFile() {
+            var file = document.getElementById('filename').files[0];
+            var reader = new FileReader();
+            var rawData = new ArrayBuffer();            
+            reader.loadend = function() {
+            }
+            reader.onload = function(e) {
+                rawData = e.target.result;
+                var ws = new WebSocket("ws://localhost:3000");
+                ws.binaryType = "arraybuffer";
+                ws.onopen = function() {
+                    console.log("Connected");
+                    ws.send(rawData);
+                };
+                ws.onmessage = function(evt) {
+                    console.log("file path:", evt.data);
+                };
+                ws.onclose = function() {
+                    console.log("Connection is closed...");
+                };
+                ws.onerror = function(e) {
+                    console.error(e.msg);
+                }
+            }
+            reader.readAsArrayBuffer(file);
+        }
+    </script>
+</body>
+</html>
